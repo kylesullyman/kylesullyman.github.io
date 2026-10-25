@@ -9,6 +9,7 @@
     "check": "astro check",
     "verify:gbc": "node scripts/verify-gbc.mjs",
     "verify:gbc:reduced": "node scripts/verify-gbc-reduced.mjs",
+    "verify:loader": "node scripts/verify-loader.mjs",
     "bench:load": "node scripts/bench-load.mjs"
   },
   "dependencies": {

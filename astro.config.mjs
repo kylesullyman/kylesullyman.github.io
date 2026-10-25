@@ -8,12 +8,10 @@ export default defineConfig({
   integrations: [react(), preloadIslands()],
 
   build: {
-    // The console island is a ~240KB chunk (three.js). Without a preload hint
-    // the browser cannot discover it until it has parsed and run Astro's
-    // inline bootstrap, which costs ~60ms of dead time before the fetch even
-    // starts. Emitting link tags lets the preload scanner kick it off while
-    // the HTML is still being parsed.
-    inlineStylesheets: 'auto',
+    // Ship the small stylesheets in the initial HTML. Even with the loader's
+    // own CSS inlined, an external layout stylesheet blocks its first paint
+    // and animation until that extra request completes.
+    inlineStylesheets: 'always',
   },
 
   vite: {
