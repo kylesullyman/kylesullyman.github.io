@@ -61,6 +61,9 @@ function Scene({
   spinHandle: HTMLElement | null;
 }) {
   const input = useMemo(() => createInput(), []);
+  // The camera frames this group's measured bounds, so it must be the node
+  // the rotation is applied to.
+  const spinGroup = useRef<THREE.Group | null>(null);
   const [introDone, setIntroDone] = useState(false);
   const [dragging, setDragging] = useState(false);
   const reduced = useMemo(prefersReducedMotion, []);
@@ -126,6 +129,7 @@ function Scene({
       <IntroSpin disabled={reduced} onComplete={handleComplete} restTilt={REST_TILT}>
         <DragRotate
           enabled={introDone}
+          groupRef={spinGroup}
           onDragStart={handleDragStart}
           onDragChange={setDragging}
           gestureElement={spinHandle}
@@ -133,7 +137,7 @@ function Scene({
           <Console input={input} texture={texture} on={introDone} dragging={dragging} />
         </DragRotate>
       </IntroSpin>
-      <FitCamera />
+      <FitCamera target={spinGroup} />
     </>
   );
 }

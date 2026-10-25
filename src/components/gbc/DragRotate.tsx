@@ -38,6 +38,8 @@ const PITCH_LIMIT = 0.65;
 export interface DragRotateProps {
   /** Drag is ignored while false (e.g. during the intro). */
   enabled?: boolean;
+  /** Exposes the rotating group so the camera can frame its real bounds. */
+  groupRef?: React.MutableRefObject<THREE.Group | null>;
   /** Fired when a drag commits; use it to cancel in-flight button presses. */
   onDragStart?: () => void;
   /** Reports drag state so the cursor can change. */
@@ -62,6 +64,7 @@ export interface DragRotateProps {
 
 export function DragRotate({
   enabled = true,
+  groupRef,
   onDragStart,
   onDragChange,
   gestureElement = null,
@@ -251,5 +254,14 @@ export function DragRotate({
     node.rotation.x = state.pitch;
   });
 
-  return <group ref={group}>{children}</group>;
+  return (
+    <group
+      ref={(node) => {
+        group.current = node;
+        if (groupRef) groupRef.current = node;
+      }}
+    >
+      {children}
+    </group>
+  );
 }

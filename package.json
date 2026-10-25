@@ -10,7 +10,8 @@
     "verify:gbc": "node scripts/verify-gbc.mjs",
     "verify:gbc:reduced": "node scripts/verify-gbc-reduced.mjs",
     "verify:loader": "node scripts/verify-loader.mjs",
-    "bench:load": "node scripts/bench-load.mjs"
+    "bench:load": "node scripts/bench-load.mjs",
+    "verify:fit": "node scripts/verify-fit.mjs"
   },
   "dependencies": {
     "@astrojs/react": "^7.0.1",
