@@ -18,6 +18,7 @@ import { GBC_EVENTS, KEY_MAP, createInput, type GbcButtonEvent } from './input';
 import { useScreen } from './screen/useScreen';
 import { IntroSpin } from './IntroSpin';
 import { FitCamera } from './FitCamera';
+import { DragRotate } from './DragRotate';
 import { Console } from './Console';
 
 /** Resting pose: a touch of yaw and pitch so it reads as a 3D object. */
@@ -32,7 +33,14 @@ function prefersReducedMotion() {
 function Scene({ onReady }: { onReady: () => void }) {
   const input = useMemo(() => createInput(), []);
   const [introDone, setIntroDone] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const reduced = useMemo(prefersReducedMotion, []);
+
+  // A drag that began on a button must not also fire that button. Once the
+  // drag commits, drop every held button so nothing sticks or registers.
+  const handleDragStart = useCallback(() => {
+    input.releaseAll('pointer');
+  }, [input]);
 
   // Screen stays dark until the console has landed.
   const texture = useScreen({ input, paused: !introDone });
@@ -91,7 +99,13 @@ function Scene({ onReady }: { onReady: () => void }) {
       </Environment>
 
       <IntroSpin disabled={reduced} onComplete={handleComplete} restTilt={REST_TILT}>
-        <Console input={input} texture={texture} on={introDone} />
+        <DragRotate
+          enabled={introDone}
+          onDragStart={handleDragStart}
+          onDragChange={setDragging}
+        >
+          <Console input={input} texture={texture} on={introDone} dragging={dragging} />
+        </DragRotate>
       </IntroSpin>
       <FitCamera />
     </>
@@ -161,7 +175,7 @@ export default function GameBoyColor({
       <div ref={liveRef} aria-live="polite" className="gbc-sr-only" />
 
       <p className={`gbc-hint ${ready ? 'is-visible' : ''}`}>
-        Click the buttons, or use arrows, Z/X and Enter.
+        Drag to spin it. Click the buttons, or use arrows, Z/X and Enter.
       </p>
     </div>
   );

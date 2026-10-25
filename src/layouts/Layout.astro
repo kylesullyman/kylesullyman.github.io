@@ -49,6 +49,11 @@ const { title } = Astro.props;
     flex: 1 1 auto;
     min-height: 0;
     outline: none;
+    /* Draggable to rotate; Console swaps in 'grabbing' mid-drag. */
+    cursor: grab;
+    /* A drag crossing the canvas edge must not select page text. */
+    user-select: none;
+    -webkit-user-select: none;
   }
   .gbc-sr-only {
     position: absolute;

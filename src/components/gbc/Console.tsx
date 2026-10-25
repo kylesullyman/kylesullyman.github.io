@@ -2,7 +2,7 @@
  * Assembles the full console: shell, internals, LCD and all controls.
  */
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type * as THREE from 'three';
 
 import { BODY, FACE_BUTTONS, PALETTE, PILL_BUTTONS } from './spec';
@@ -24,9 +24,11 @@ export interface ConsoleProps {
   texture: THREE.Texture;
   /** Powers the LED and sets the switch position. */
   on?: boolean;
+  /** A drag is in progress; shows a grabbing cursor over the whole model. */
+  dragging?: boolean;
 }
 
-export function Console({ input, texture, on = true }: ConsoleProps) {
+export function Console({ input, texture, on = true, dragging = false }: ConsoleProps) {
   const [hoverCount, setHoverCount] = useState(0);
 
   // Each control reports hover; any > 0 means show the pointer cursor.
@@ -34,10 +36,15 @@ export function Console({ input, texture, on = true }: ConsoleProps) {
     setHoverCount((count) => Math.max(0, count + (hovered ? 1 : -1)));
   }, []);
 
+  // Cursor is a DOM side effect, so it belongs in an effect rather than in
+  // render. Dragging wins over hover, and the cursor is always restored.
   const hovering = hoverCount > 0;
-  if (typeof document !== 'undefined') {
-    document.body.style.cursor = hovering ? 'pointer' : '';
-  }
+  useEffect(() => {
+    document.body.style.cursor = dragging ? 'grabbing' : hovering ? 'pointer' : '';
+    return () => {
+      document.body.style.cursor = '';
+    };
+  }, [hovering, dragging]);
 
   // Controls seat inside their cutouts, with the caps just proud of the face.
   const faceZ = BODY.front - 0.35;
