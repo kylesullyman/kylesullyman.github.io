@@ -2,6 +2,60 @@
 import Layout from '../layouts/Layout.astro';
 ---
 <Layout title="Projects">
-  <h1>Projects</h1>
-  <p>Coming soon.</p>
+  <div class="projects">
+    <p class="projects-intro">Here are some of the projects I've worked on:</p>
+
+    <article class="project">
+      <h2>Sphere Smackdown: Brawl of the Balls</h2>
+      <video class="project-video" src="/video/sphere-smackdown.mp4" controls playsinline muted loop></video>
+      <details class="project-details">
+        <summary>About the project</summary>
+        <p>
+          A game I built with a close friend, Emily Bosa, to learn the ins
+          and outs of 2D collisions and physics in the Unity engine. It also
+          meant real practice with Unity's version control &mdash; a hassle
+          in the moment, but worth learning.
+        </p>
+      </details>
+    </article>
+  </div>
 </Layout>
+
+<style>
+  .projects {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2rem;
+  }
+  .projects-intro {
+    text-align: center;
+  }
+  .project {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    max-width: 32rem;
+  }
+  .project h2 {
+    margin: 0;
+    font-size: 1.1rem;
+    text-align: center;
+  }
+  .project-video {
+    width: 100%;
+    border-radius: 0.5rem;
+  }
+  .project-details {
+    width: 100%;
+  }
+  .project-details summary {
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .project-details p {
+    margin: 0.5rem 0 0;
+    color: #555;
+  }
+</style>
