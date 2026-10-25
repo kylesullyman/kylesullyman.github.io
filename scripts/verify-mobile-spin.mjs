@@ -46,7 +46,7 @@ try {
     const touch = (type, x, y) => cdp.send('Input.dispatchTouchEvent', {
       type, touchPoints: type === 'touchEnd' || type === 'touchCancel' ? [] : [{ x, y, id: 1 }],
     });
-    async function drag(x, y, dx, dy, held = false) {
+    async function drag(x, y, dx, dy, held = false, settleMs = 250) {
       if (mobile) await touch('touchStart', x, y);
       else { await page.mouse.move(x, y); await page.mouse.down(); }
       for (let i = 1; i <= 12; i++) {
@@ -54,7 +54,7 @@ try {
         else await page.mouse.move(x + dx * i / 12, y + dy * i / 12);
         await page.waitForTimeout(20);
       }
-      await page.waitForTimeout(250);
+      if (settleMs) await page.waitForTimeout(settleMs);
       if (!held) {
         if (mobile) await touch('touchEnd');
         else await page.mouse.up();
@@ -76,13 +76,23 @@ try {
       await drag(handle.x + handle.width / 2, handle.y + handle.height / 2, 100, -35, true);
       const rotated = await pose();
       assert(distance(after, rotated) > 0.3, 'Holding and dragging the handle must rotate');
-      await page.screenshot({ path: `${out}/held.png` });
       await touch('touchEnd');
-      await page.waitForTimeout(100);
+      await drag(handle.x + handle.width / 2, handle.y + handle.height / 2, 70, 0, true, 0);
+      await touch('touchEnd');
       const released = await pose();
-      await page.waitForTimeout(600);
-      assert(distance(released, await pose()) < 0.01, 'Mobile rotation must stop on release');
-      results.push('Mobile handle rotates while held and stops on release: PASS');
+      await page.waitForTimeout(250);
+      const coasting = await pose();
+      assert(coasting[1] > released[1] + 0.03, 'Release should coast in the drag direction');
+      // Measured settle time for this gesture is ~3.7s on mobile and ~3.8s on
+      // desktop; 5s leaves headroom without being a blind guess.
+      await page.waitForTimeout(5000);
+      const settled = await pose();
+      await page.waitForTimeout(400);
+      assert(distance(settled, await pose()) < 0.01, 'Momentum should decay to rest');
+      assert(Math.hypot(settled[0], settled[1]) < 0.05,
+        `Mobile rotation should drift back to rest, settled at ${settled}`);
+      results.push('Mobile release momentum and return to rest: PASS');
+      await page.screenshot({ path: `${out}/held.png` });
       for (const reason of ['cancel', 'blur', 'capture-loss']) {
         await drag(handle.x + handle.width / 2, handle.y + handle.height / 2, 25, 0, true);
         if (reason === 'cancel') await touch('touchCancel');
@@ -92,11 +102,22 @@ try {
           // The pointer ID is captured from the actual touch stream.
           button.releasePointerCapture(window.__handlePointer);
         });
-        await page.waitForTimeout(100);
-        const stopped = await pose();
-        await page.waitForTimeout(200);
-        assert(distance(stopped, await pose()) < 0.01, `${reason} must stop mobile rotation`);
-        if (reason !== 'cancel') await touch('touchEnd');
+        // An interrupted gesture coasts and springs home like a normal
+        // release; what matters is that the hold was dropped, so further
+        // touch movement no longer steers it and it comes back to rest.
+        await page.waitForTimeout(5000);
+        const parked = await pose();
+        assert(Math.hypot(parked[0], parked[1]) < 0.05,
+          `${reason} must release the hold and return to rest, got ${parked}`);
+        // touchCancel ends the touch stream outright, so there is no finger
+        // left to steer with; the other two leave it down and must be inert.
+        if (reason !== 'cancel') {
+          await touch('touchMove', handle.x + handle.width / 2 + 60, handle.y + handle.height / 2);
+          await page.waitForTimeout(250);
+          assert(distance(parked, await pose()) < 0.05,
+            `${reason} must stop the drag steering rotation`);
+          await touch('touchEnd');
+        }
       }
       results.push('Touch cancellation, blur and capture-loss cleanup: PASS');
       // Guarantee scrollable content even if the home-page copy changes.

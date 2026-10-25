@@ -164,27 +164,26 @@ const { title, deferTitle = false } = Astro.props;
   /* ---- Touch-only hold-to-spin handle ---- */
   .gbc-spin-handle {
     position: absolute;
-    left: 0.75rem;
+    /* Sits clear of the console's left edge rather than straddling it --
+       the mark is solid black and loses contrast over the red shell. */
+    left: 0.1rem;
     /* Clears the hint line that sits under the canvas. */
     bottom: 3.25rem;
     z-index: 3;
 
     display: inline-flex;
     align-items: center;
-    gap: 0.45rem;
-    padding: 0.6rem 0.85rem;
-    min-height: 44px;
+    justify-content: center;
+    /* Bare icon, but the tap target stays at the 44px minimum. */
+    width: 44px;
+    height: 44px;
+    padding: 0;
 
-    font: inherit;
-    font-size: 0.78rem;
-    font-weight: 600;
-    letter-spacing: 0.02em;
-    color: #c8103c;
-
-    background: rgba(255, 255, 255, 0.92);
-    border: 1.5px solid rgba(200, 16, 60, 0.35);
-    border-radius: 999px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+    color: #111;
+    background: none;
+    border: none;
+    appearance: none;
+    -webkit-appearance: none;
 
     /* The whole point of the control: the browser must not claim the drag
        for scrolling, or the handle only works until the finger moves. */
@@ -195,28 +194,25 @@ const { title, deferTitle = false } = Astro.props;
     cursor: grab;
 
     opacity: 0;
-    transition: opacity 0.4s ease 0.1s, transform 0.12s ease,
-      background 0.12s ease;
+    transition: opacity 0.4s ease 0.1s, transform 0.12s ease;
   }
   /* Only usable once the intro has finished, so it fades in with the hint. */
   .gbc-spin-handle.is-visible {
     opacity: 1;
   }
+  /* No fill or border to light up, so the press reads through scale alone. */
   .gbc-spin-handle:active {
-    transform: scale(0.95);
-    background: #c8103c;
-    border-color: #c8103c;
-    color: #fff;
+    transform: scale(0.92);
     cursor: grabbing;
   }
-  .gbc-spin-handle-icon {
-    display: inline-flex;
-    width: 1.05rem;
-    height: 1.05rem;
-  }
-  .gbc-spin-handle-icon svg {
-    width: 100%;
-    height: 100%;
+  .gbc-spin-handle svg {
+    /* Smaller than the 44px target: the glyph is the visual, the rest is
+       invisible touch margin. The orbit geometry is derived against this
+       size -- see the comment on the mark -- so changing it needs the ring
+       and body re-checked, not just a new number here. */
+    width: 30px;
+    height: 30px;
+    display: block;
   }
 
   @media (prefers-reduced-motion: reduce) {

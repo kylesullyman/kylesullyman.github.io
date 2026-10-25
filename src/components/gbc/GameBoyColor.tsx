@@ -222,36 +222,54 @@ export default function GameBoyColor({
           className={`gbc-spin-handle ${ready ? 'is-visible' : ''}`}
           aria-label="Hold and drag to rotate the console"
         >
-          <span className="gbc-spin-handle-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              {/* Circular arrow: reads as "rotate" without needing a label. */}
-              <path
-                d="M20 12a8 8 0 1 1-2.34-5.66"
-                stroke="currentColor"
-                strokeWidth="2.2"
-                strokeLinecap="round"
-              />
-              <path
-                d="M20 3.5V8h-4.5"
-                stroke="currentColor"
-                strokeWidth="2.2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </span>
-          <span className="gbc-spin-handle-text">Hold to spin</span>
+          {/*
+            Orbit mark: a body with a ring around it in perspective.
+
+            Three layers give the depth read: the full ellipse, the body
+            painted over it (hiding the ring's far half), then the ring's
+            near half painted back over the body.
+
+            Two constraints have to hold at once, and they pull in opposite
+            directions. The body must sit *inside* the ring's inner edge
+            (4.4 vs 1.95) so the ring is visibly occluded behind it, and it
+            must also clear the ring's *outer* edge (4.4 vs 3.25) so the top
+            and bottom of the body poke past the ring. Lose the first and it
+            is a dot in a circle; lose the second and it is a solid blob.
+
+            Checked in rendered pixels at the 30px draw size rather than in
+            viewBox units: the body clears the ring by ~1.4px and hides
+            ~3.1px of it, both of which survive rasterisation. Shrinking the
+            icon without re-deriving these collapses the gaps.
+          */}
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <ellipse
+              cx="12"
+              cy="12"
+              rx="10.2"
+              ry="2.6"
+              transform="rotate(-30 12 12)"
+              stroke="currentColor"
+              strokeWidth="1.3"
+            />
+            <circle cx="12" cy="12" r="4.4" fill="currentColor" />
+            <path
+              d="M 20.83 6.90 A 10.2 2.6 -30 0 0 3.17 17.10"
+              stroke="currentColor"
+              strokeWidth="1.3"
+              strokeLinecap="round"
+            />
+          </svg>
         </button>
       ) : null}
 
       {/* Screen-reader announcements for button presses. */}
       <div ref={liveRef} aria-live="polite" className="gbc-sr-only" />
 
-      <p className={`gbc-hint ${ready ? 'is-visible' : ''}`}>
-        {isTouch
-          ? 'Tap the buttons. Hold the spin pad, bottom left, and drag to turn it.'
-          : 'Drag to spin it. Click the buttons, or use arrows, Z/X and Enter.'}
-      </p>
+      {/*<p className={`gbc-hint ${ready ? 'is-visible' : ''}`}>*/}
+      {/*  {isTouch*/}
+      {/*    ? 'Tap the buttons. Hold the spin pad, bottom left, and drag to turn it.'*/}
+      {/*    : 'Drag to spin it. Click the buttons, or use arrows, Z/X and Enter.'}*/}
+      {/*</p>*/}
     </div>
   );
 }

@@ -51,6 +51,10 @@ export interface DragRotateProps {
    * "spin this" or "scroll the page", and whichever we choose is wrong half
    * the time. Routing touch rotation through a dedicated control removes the
    * ambiguity and leaves vertical scroll working everywhere else.
+   *
+   * Release behaviour is identical either way: the flick carries and the
+   * console drifts home, so the handle feels like dragging the model rather
+   * than like a switch that cuts the motion dead.
    */
   gestureElement?: HTMLElement | null;
   children: React.ReactNode;
@@ -65,6 +69,14 @@ export function DragRotate({
 }: DragRotateProps) {
   const group = useRef<THREE.Group>(null);
   const gl = useThree((state) => state.gl);
+  /**
+   * Lets the frame loop end a gesture whose pointer capture vanished without
+   * a matching event. `lostpointercapture` is not reliably delivered after a
+   * programmatic `releasePointerCapture`, and when it goes missing the drag
+   * stays committed: rotation freezes at the last pose and never springs
+   * home. Holding the teardown here keeps that recovery in one place.
+   */
+  const teardown = useRef<{ stop: () => void; source: HTMLElement } | null>(null);
 
   const drag = useRef({
     tracking: false,
@@ -96,13 +108,6 @@ export function DragRotate({
       state.tracking = false;
       state.committed = false;
       state.pointerId = -1;
-      if (immediate) {
-        // Hold-to-spin stops at the visible pose, without a flick or spring-back.
-        state.velYaw = 0;
-        state.velPitch = 0;
-        state.targetYaw = state.yaw;
-        state.targetPitch = state.pitch;
-      }
       if (pointerId !== -1 && source.hasPointerCapture(pointerId)) {
         source.releasePointerCapture(pointerId);
       }
@@ -179,6 +184,7 @@ export function DragRotate({
     source.addEventListener('pointercancel', onUp);
     source.addEventListener('lostpointercapture', onUp);
     window.addEventListener('blur', stop);
+    teardown.current = { stop, source };
 
     return () => {
       source.removeEventListener('pointerdown', onDown);
@@ -187,6 +193,7 @@ export function DragRotate({
       source.removeEventListener('pointercancel', onUp);
       source.removeEventListener('lostpointercapture', onUp);
       window.removeEventListener('blur', stop);
+      teardown.current = null;
       stop();
     };
   }, [gl, enabled, onDragStart, onDragChange, gestureElement]);
@@ -198,7 +205,17 @@ export function DragRotate({
     const state = drag.current;
     const delta = Math.min(rawDelta, 1 / 20);
 
-    if (!state.committed && !gestureElement) {
+    // A committed gesture holds pointer capture. If it does not, the capture
+    // was dropped without the event that normally ends the drag, so end it
+    // here -- otherwise the console hangs at its last pose indefinitely.
+    if (state.committed && teardown.current) {
+      const { stop, source } = teardown.current;
+      if (state.pointerId !== -1 && !source.hasPointerCapture(state.pointerId)) {
+        stop();
+      }
+    }
+
+    if (!state.committed) {
       // Carry the flick, decaying toward zero.
       if (Math.abs(state.velYaw) > VELOCITY_EPSILON) {
         state.targetYaw += state.velYaw;
