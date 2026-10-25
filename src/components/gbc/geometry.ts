@@ -208,6 +208,41 @@ export function dpadShape(arm: number, thickness: number, fillet = 0.08): THREE.
   return shape;
 }
 
+/**
+ * Button cap with a flat top and a rounded shoulder: straight cylindrical
+ * sides that curve over into a flat disc, lathed around the z axis.
+ *
+ * A dome reads as a Game Boy *pocket* button; the Color's A/B caps are flat
+ * discs with a soft radius on the rim, which is what this builds.
+ */
+export function flatCapGeometry(
+  radius: number,
+  height: number,
+  edgeRadius: number,
+  radialSegments = 48,
+  edgeSegments = 8,
+): THREE.LatheGeometry {
+  const r = Math.min(edgeRadius, radius * 0.85, height * 0.9);
+  const half = height / 2;
+  const points: THREE.Vector2[] = [
+    new THREE.Vector2(0, -half),
+    new THREE.Vector2(radius, -half),
+  ];
+  // Quarter arc from the side wall over to the flat top.
+  for (let i = 0; i <= edgeSegments; i++) {
+    const a = (i / edgeSegments) * (Math.PI / 2);
+    points.push(
+      new THREE.Vector2(radius - r + Math.cos(a) * r, half - r + Math.sin(a) * r),
+    );
+  }
+  points.push(new THREE.Vector2(0, half));
+
+  const geometry = new THREE.LatheGeometry(points, radialSegments);
+  // Lathe spins around +y; stand the cap up so it faces the viewer.
+  geometry.rotateX(Math.PI / 2);
+  return geometry;
+}
+
 /** Bevelled extrusion of an arbitrary shape, centred in z. */
 export function extrudeCentered(
   shape: THREE.Shape,

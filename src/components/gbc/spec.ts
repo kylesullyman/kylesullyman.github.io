@@ -57,10 +57,12 @@ export const DPAD = {
 
 /** A and B sit on a ~20 degree incline, A above and right of B. */
 export const FACE_BUTTONS = {
-  radius: mm(4.75),
-  height: mm(2.4),
-  b: { x: mm(13.5), y: mm(-28) },
-  a: { x: mm(28), y: mm(-20.5) },
+  radius: mm(5.7),
+  height: mm(2.6),
+  /** Radius of the rounded shoulder between the flat top and the side wall. */
+  edgeRadius: mm(1.1),
+  b: { x: mm(11), y: mm(-28) },
+  a: { x: mm(25.5), y: mm(-20.5) },
 } as const;
 
 /** SELECT / START: angled pills below the controls. */
@@ -126,6 +128,8 @@ export const PALETTE = {
   bezelInner: '#14151a',
   button: '#3a2f47',
   buttonRim: '#2a2234',
+  /** Silkscreened A / B glyph on the button caps. */
+  buttonLabel: '#efe3f2',
   pill: '#4a4458',
   led: '#ff2b3d',
   ledOff: '#5e1f28',

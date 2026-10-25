@@ -3,7 +3,7 @@
  * details: speaker grille, power LED, volume wheel, power switch, IR window.
  */
 
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 
 import {
@@ -17,6 +17,8 @@ import {
   SPEAKER,
   VOLUME_WHEEL,
 } from '../spec';
+import { flatCapGeometry } from '../geometry';
+import { drawText, GLYPH_HEIGHT, textWidth } from '../font';
 import type { GbcInput } from '../input';
 import { Pressable } from './Pressable';
 
@@ -24,7 +26,46 @@ interface HoverProps {
   onHoverChange?: (hovered: boolean) => void;
 }
 
-/** Round A or B cap: slightly domed cylinder in a recessed well. */
+/**
+ * Transparent canvas carrying a single pixel-font glyph, used as the
+ * silkscreened letter on an A/B cap. Same font as the screen and the
+ * wordmark so the typography stays consistent across the model.
+ *
+ * The canvas is cropped tight to the glyph and its aspect returned, so the
+ * caller can size the quad without the letter squashing or floating in
+ * empty padding.
+ */
+function useLetterTexture(letter: string): {
+  texture: THREE.Texture;
+  aspect: number;
+} {
+  const { texture, aspect } = useMemo(() => {
+    const scale = 16;
+    const pad = scale; // one pixel of the font grid on every side
+    const glyphWidth = textWidth(letter, { scale });
+    const glyphHeight = GLYPH_HEIGHT * scale;
+    const canvas = document.createElement('canvas');
+    canvas.width = glyphWidth + pad * 2;
+    canvas.height = glyphHeight + pad * 2;
+
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.imageSmoothingEnabled = false;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawText(ctx, letter, pad, pad, PALETTE.buttonLabel, { scale });
+    }
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
+    return { texture: tex, aspect: canvas.width / canvas.height };
+  }, [letter]);
+
+  useEffect(() => () => texture.dispose(), [texture]);
+  return { texture, aspect };
+}
+
+/** A or B cap: flat top with a rounded shoulder, seated in a recessed well. */
 export function RoundButton({
   input,
   button,
@@ -39,7 +80,20 @@ export function RoundButton({
   y: number;
   z: number;
 }) {
-  const { radius, height } = FACE_BUTTONS;
+  const { radius, height, edgeRadius } = FACE_BUTTONS;
+  const { texture: letter, aspect } = useLetterTexture(button.toUpperCase());
+
+  const cap = useMemo(
+    () => flatCapGeometry(radius, height, edgeRadius),
+    [radius, height, edgeRadius],
+  );
+  useEffect(() => () => cap.dispose(), [cap]);
+
+  // Letter height fills most of the flat top; width follows the glyph aspect
+  // so the pixels stay square.
+  const letterHeight = (radius - edgeRadius) * 1.7;
+  const letterWidth = letterHeight * aspect;
+
   return (
     <group position={[x, y, 0]}>
       {/* Dark recess behind the shell cutout. */}
@@ -56,21 +110,22 @@ export function RoundButton({
         hitArea={[radius * 2.6, radius * 2.6]}
         onHoverChange={onHoverChange}
       >
-        <mesh castShadow rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[radius, radius * 0.97, height, 40]} />
+        <mesh geometry={cap} castShadow>
           <meshStandardMaterial
             color={PALETTE.button}
             roughness={0.5}
             metalness={0.03}
           />
         </mesh>
-        {/* Domed top. */}
-        <mesh position={[0, 0, height / 2]} scale={[1, 1, 0.3]}>
-          <sphereGeometry args={[radius, 40, 20, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        {/* Printed letter, just proud of the flat top so it never z-fights. */}
+        <mesh position={[0, 0, height / 2 + 0.012]}>
+          <planeGeometry args={[letterWidth, letterHeight]} />
           <meshStandardMaterial
-            color={PALETTE.button}
-            roughness={0.42}
-            metalness={0.03}
+            map={letter}
+            transparent
+            roughness={0.65}
+            polygonOffset
+            polygonOffsetFactor={-2}
           />
         </mesh>
       </Pressable>
