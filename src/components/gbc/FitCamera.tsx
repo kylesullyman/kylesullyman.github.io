@@ -23,7 +23,7 @@ import { PITCH_LIMIT } from './DragRotate';
  * limits: 0.94 still caught the left edge on the narrowest aspect ratio
  * (Pixel 7, 0.58) at the pitch limit, so this keeps a little more slack.
  */
-const FILL = 0.9;
+const FILL = 1.3;
 
 /** How fast the distance chases its target. Higher is tighter. */
 const FOLLOW = 6;
