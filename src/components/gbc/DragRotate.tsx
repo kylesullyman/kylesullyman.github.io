@@ -42,6 +42,17 @@ export interface DragRotateProps {
   onDragStart?: () => void;
   /** Reports drag state so the cursor can change. */
   onDragChange?: (dragging: boolean) => void;
+  /**
+   * Element the gesture is read from.
+   *
+   * Desktop leaves this null and drags the canvas directly. Touch passes the
+   * hold-to-spin handle, because a free drag on the canvas competes with page
+   * scrolling: the browser cannot know whether a finger on the console means
+   * "spin this" or "scroll the page", and whichever we choose is wrong half
+   * the time. Routing touch rotation through a dedicated control removes the
+   * ambiguity and leaves vertical scroll working everywhere else.
+   */
+  gestureElement?: HTMLElement | null;
   children: React.ReactNode;
 }
 
@@ -49,6 +60,7 @@ export function DragRotate({
   enabled = true,
   onDragStart,
   onDragChange,
+  gestureElement = null,
   children,
 }: DragRotateProps) {
   const group = useRef<THREE.Group>(null);
@@ -71,18 +83,42 @@ export function DragRotate({
   });
 
   useEffect(() => {
-    const canvas = gl.domElement;
+    // When a handle is supplied it owns the gesture outright and the canvas
+    // stops listening, so a touch-drag on the console never rotates.
+    const source: HTMLElement = gestureElement ?? gl.domElement;
+    /** The handle exists only to rotate, so there is nothing to disambiguate. */
+    const immediate = gestureElement !== null;
     const state = drag.current;
 
     const stop = () => {
+      const pointerId = state.pointerId;
       if (state.committed) onDragChange?.(false);
       state.tracking = false;
       state.committed = false;
       state.pointerId = -1;
+      if (immediate) {
+        // Hold-to-spin stops at the visible pose, without a flick or spring-back.
+        state.velYaw = 0;
+        state.velPitch = 0;
+        state.targetYaw = state.yaw;
+        state.targetPitch = state.pitch;
+      }
+      if (pointerId !== -1 && source.hasPointerCapture(pointerId)) {
+        source.releasePointerCapture(pointerId);
+      }
+    };
+
+    const commit = (event: PointerEvent) => {
+      state.committed = true;
+      source.setPointerCapture?.(event.pointerId);
+      onDragStart?.();
+      onDragChange?.(true);
     };
 
     const onDown = (event: PointerEvent) => {
-      if (!enabled || event.button !== 0) return;
+      if (!enabled || state.tracking || event.button !== 0) return;
+      // Do not briefly enable canvas dragging while the mobile handle mounts.
+      if (!immediate && window.matchMedia('(hover: none) and (pointer: coarse)').matches) return;
       state.tracking = true;
       state.committed = false;
       state.pointerId = event.pointerId;
@@ -90,6 +126,11 @@ export function DragRotate({
       state.startY = event.clientY;
       state.lastX = event.clientX;
       state.lastY = event.clientY;
+      if (immediate) {
+        // Stop the browser treating the hold as a scroll or a text selection.
+        event.preventDefault();
+        commit(event);
+      }
     };
 
     const onMove = (event: PointerEvent) => {
@@ -101,13 +142,10 @@ export function DragRotate({
           event.clientY - state.startY,
         );
         if (travelled < DRAG_THRESHOLD) return;
-        // Past the threshold: this is a drag, not a press.
-        state.committed = true;
-        // Capture here rather than on down, so a plain press still gets its
-        // pointerup delivered to the button's own handler.
-        canvas.setPointerCapture?.(event.pointerId);
-        onDragStart?.();
-        onDragChange?.(true);
+        // Past the threshold: this is a drag, not a press. Capture here
+        // rather than on down, so a plain press still gets its pointerup
+        // delivered to the button's own handler.
+        commit(event);
       }
 
       const dx = event.clientX - state.lastX;
@@ -129,25 +167,29 @@ export function DragRotate({
 
     const onUp = (event: PointerEvent) => {
       if (event.pointerId !== state.pointerId) return;
-      canvas.releasePointerCapture?.(event.pointerId);
       stop();
     };
 
-    canvas.addEventListener('pointerdown', onDown);
-    canvas.addEventListener('pointermove', onMove);
-    canvas.addEventListener('pointerup', onUp);
-    canvas.addEventListener('pointercancel', onUp);
+    // The handle must claim the touch before the browser starts scrolling,
+    // which requires a non-passive listener.
+    const downOptions = immediate ? { passive: false } : undefined;
+    source.addEventListener('pointerdown', onDown, downOptions);
+    source.addEventListener('pointermove', onMove);
+    source.addEventListener('pointerup', onUp);
+    source.addEventListener('pointercancel', onUp);
+    source.addEventListener('lostpointercapture', onUp);
     window.addEventListener('blur', stop);
 
     return () => {
-      canvas.removeEventListener('pointerdown', onDown);
-      canvas.removeEventListener('pointermove', onMove);
-      canvas.removeEventListener('pointerup', onUp);
-      canvas.removeEventListener('pointercancel', onUp);
+      source.removeEventListener('pointerdown', onDown);
+      source.removeEventListener('pointermove', onMove);
+      source.removeEventListener('pointerup', onUp);
+      source.removeEventListener('pointercancel', onUp);
+      source.removeEventListener('lostpointercapture', onUp);
       window.removeEventListener('blur', stop);
       stop();
     };
-  }, [gl, enabled, onDragStart, onDragChange]);
+  }, [gl, enabled, onDragStart, onDragChange, gestureElement]);
 
   useFrame((_, rawDelta) => {
     const node = group.current;
@@ -156,7 +198,7 @@ export function DragRotate({
     const state = drag.current;
     const delta = Math.min(rawDelta, 1 / 20);
 
-    if (!state.committed) {
+    if (!state.committed && !gestureElement) {
       // Carry the flick, decaying toward zero.
       if (Math.abs(state.velYaw) > VELOCITY_EPSILON) {
         state.targetYaw += state.velYaw;

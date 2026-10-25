@@ -9,12 +9,13 @@
  */
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Canvas } from '@react-three/fiber';
-import { Environment, Lightformer } from '@react-three/drei';
+import { Canvas, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 
 import { BODY, PALETTE } from './spec';
 import { GBC_EVENTS, KEY_MAP, createInput, type GbcButtonEvent } from './input';
+import { createEnvironment } from './environment';
+import { useIsTouch } from './useIsTouch';
 import { useScreen } from './screen/useScreen';
 import { IntroSpin } from './IntroSpin';
 import { FitCamera } from './FitCamera';
@@ -29,8 +30,36 @@ function prefersReducedMotion() {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
+/**
+ * Installs the procedural environment map as `scene.environment`.
+ * Built once per renderer, and released on unmount.
+ */
+function SceneEnvironment() {
+  const gl = useThree((state) => state.gl);
+  const scene = useThree((state) => state.scene);
+
+  useEffect(() => {
+    const texture = createEnvironment(gl);
+    const previous = scene.environment;
+    scene.environment = texture;
+    return () => {
+      scene.environment = previous;
+      texture.dispose();
+    };
+  }, [gl, scene]);
+
+  return null;
+}
+
 /** Everything inside the Canvas (needs the R3F context). */
-function Scene({ onReady }: { onReady: () => void }) {
+function Scene({
+  onReady,
+  spinHandle,
+}: {
+  onReady: () => void;
+  /** Touch-only rotation handle; null on pointer devices. */
+  spinHandle: HTMLElement | null;
+}) {
   const input = useMemo(() => createInput(), []);
   const [introDone, setIntroDone] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -92,17 +121,14 @@ function Scene({ onReady }: { onReady: () => void }) {
       <directionalLight position={[12, 4, 10]} intensity={0.7} color="#ffd9e2" />
       <directionalLight position={[0, -6, -14]} intensity={1.5} color={PALETTE.shellAttenuation} />
 
-      <Environment resolution={128}>
-        <Lightformer intensity={2.2} position={[-6, 8, 10]} scale={[12, 12, 1]} />
-        <Lightformer intensity={1.1} position={[8, 2, 8]} scale={[8, 8, 1]} color="#ffc4d2" />
-        <Lightformer intensity={1.6} position={[0, -8, -10]} scale={[14, 6, 1]} color="#ff5577" />
-      </Environment>
+      <SceneEnvironment />
 
       <IntroSpin disabled={reduced} onComplete={handleComplete} restTilt={REST_TILT}>
         <DragRotate
           enabled={introDone}
           onDragStart={handleDragStart}
           onDragChange={setDragging}
+          gestureElement={spinHandle}
         >
           <Console input={input} texture={texture} on={introDone} dragging={dragging} />
         </DragRotate>
@@ -128,6 +154,11 @@ export default function GameBoyColor({
 }: GameBoyColorProps) {
   const [ready, setReady] = useState(false);
   const liveRef = useRef<HTMLDivElement>(null);
+  const isTouch = useIsTouch();
+  // Callback ref, not useRef: DragRotate has to re-bind its listeners when
+  // the handle mounts, and a ref object mutating in place would not retrigger
+  // that effect.
+  const [spinHandle, setSpinHandle] = useState<HTMLElement | null>(null);
 
   // Bridge window events to props, and announce presses to screen readers.
   useEffect(() => {
@@ -164,18 +195,62 @@ export default function GameBoyColor({
         onCreated={({ gl }) => {
           gl.toneMapping = THREE.ACESFilmicToneMapping;
           gl.toneMappingExposure = 1.06;
+          // The shell uses transmission, which makes three re-render the whole
+          // scene into a backdrop target every frame. That target is sampled
+          // through rough, refracting plastic, so full resolution buys nothing
+          // visible -- half scale quarters the fragment work for the pass.
+          gl.transmissionResolutionScale = 0.5;
         }}
       >
         <Suspense fallback={null}>
-          <Scene onReady={() => setReady(true)} />
+          <Scene onReady={() => setReady(true)} spinHandle={spinHandle} />
         </Suspense>
       </Canvas>
+
+      {/*
+        Touch-only rotation handle. Hold it and drag to spin; the console
+        itself stays non-rotating on touch so a finger on the canvas still
+        scrolls the page. Hidden entirely on pointer devices, where dragging
+        the console directly is unambiguous.
+      */}
+      {isTouch ? (
+        <button
+          ref={setSpinHandle}
+          disabled={!ready}
+          onContextMenu={(event) => event.preventDefault()}
+          type="button"
+          className={`gbc-spin-handle ${ready ? 'is-visible' : ''}`}
+          aria-label="Hold and drag to rotate the console"
+        >
+          <span className="gbc-spin-handle-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              {/* Circular arrow: reads as "rotate" without needing a label. */}
+              <path
+                d="M20 12a8 8 0 1 1-2.34-5.66"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+              />
+              <path
+                d="M20 3.5V8h-4.5"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </span>
+          <span className="gbc-spin-handle-text">Hold to spin</span>
+        </button>
+      ) : null}
 
       {/* Screen-reader announcements for button presses. */}
       <div ref={liveRef} aria-live="polite" className="gbc-sr-only" />
 
       <p className={`gbc-hint ${ready ? 'is-visible' : ''}`}>
-        Drag to spin it. Click the buttons, or use arrows, Z/X and Enter.
+        {isTouch
+          ? 'Tap the buttons. Hold the spin pad, bottom left, and drag to turn it.'
+          : 'Drag to spin it. Click the buttons, or use arrows, Z/X and Enter.'}
       </p>
     </div>
   );

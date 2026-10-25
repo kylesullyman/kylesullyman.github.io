@@ -1,0 +1,177 @@
+---
+/**
+ * Loading indicator shown until the 3D console signals `gbc:ready`.
+ *
+ * This is deliberately static HTML + CSS with no React and no imports: the
+ * console island is `client:only` and pulls ~310KB of JS, so anything that
+ * waits on hydration would appear *after* the thing it is meant to cover.
+ * Rendered this way it paints with the first HTML parse.
+ *
+ * The wave is a sine curve that translates sideways by exactly one
+ * wavelength, forever. Because sine is periodic, shifting by one wavelength
+ * lands on an identical curve, so the loop has no visible seam.
+ *
+ * The path is generated here at build time rather than in the browser: it is
+ * a fixed curve, so there is no reason to ship the trig to the client.
+ */
+
+/**
+ * Inner box the wave is cropped to: square, and half the width it started at.
+ *
+ * The viewBox and the CSS box must keep the same aspect ratio, because
+ * preserveAspectRatio is "none" -- if only one of them changes, the curve
+ * stretches or squashes instead of the crop window resizing.
+ */
+const WIDTH = 120;
+const HEIGHT = 120;
+/** One full period, in viewBox units. Just under two periods are visible. */
+const WAVELENGTH = 64;
+/**
+ * Peak height. Sized against the box rather than fixed, so the wave keeps
+ * its proportions if the box is resized again.
+ */
+const AMPLITUDE = HEIGHT * 0.17;
+/** Sample step. Small enough that the curve reads as smooth at any size. */
+const STEP = 2;
+
+// Drawn one wavelength wider than the box so that, at any point in the
+// animation, the stretch scrolling in from the right is already populated.
+const points: string[] = [];
+for (let x = 0; x <= WIDTH + WAVELENGTH; x += STEP) {
+  const y = HEIGHT / 2 + AMPLITUDE * Math.sin((x / WAVELENGTH) * Math.PI * 2);
+  points.push(`${x} ${y.toFixed(2)}`);
+}
+const wavePath = `M ${points.join(' L ')}`;
+---
+
+<div class="gbc-loader" data-gbc-loader role="status" aria-live="polite">
+  <div class="gbc-loader-box">
+    <svg
+      class="gbc-loader-wave"
+      viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      {/*
+        The viewBox clips on its own, and clipping a vector is exact, so the
+        wave terminates on a hard vertical edge at the crop boundary rather
+        than fading or feathering out.
+      */}
+      <path d={wavePath} />
+    </svg>
+  </div>
+  <span class="gbc-sr-only">Loading the console</span>
+</div>
+
+<style define:vars={{ waveShift: `${-WAVELENGTH}px` }}>
+  .gbc-loader {
+    /* Overlays the console slot rather than sitting above it: the island is
+       client:only and renders nothing until React mounts, so the wrapper
+       owns the height and nothing reflows when the canvas appears. */
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #fff;
+    transition: opacity 0.35s ease;
+  }
+
+  /* Set once the console reports ready; the element is removed after the
+     fade so it never sits in the a11y tree or eats pointer events. */
+  .gbc-loader.is-done {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .gbc-loader-box {
+    /* Square, and half the original width. The SVG viewBox matches this
+       ratio so the curve is cropped rather than distorted. */
+    width: min(120px, 40vw);
+    aspect-ratio: 1;
+    /* No frame: the crop itself is the boundary, and overflow:hidden gives
+       it a hard edge without drawing anything. */
+    overflow: hidden;
+    background: #fff;
+  }
+
+  .gbc-loader-wave {
+    display: block;
+    width: 100%;
+    height: 100%;
+    /* Scaled by the box, so the stroke must not scale with it. */
+    overflow: visible;
+  }
+
+  .gbc-loader-wave path {
+    fill: none;
+    stroke: #000;
+    stroke-width: 2;
+    /* Butt caps and miter joins keep the line's own ends hard too, matching
+       the crop edge rather than rounding off against it. */
+    stroke-linecap: butt;
+    stroke-linejoin: miter;
+    vector-effect: non-scaling-stroke;
+    animation: gbc-wave-scroll 1.6s linear infinite;
+  }
+
+  /* Travels exactly one wavelength, so the curve it lands on is identical
+     to the one it started from and the loop is seamless. */
+  @keyframes gbc-wave-scroll {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(var(--waveShift));
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .gbc-loader-wave path {
+      animation: none;
+    }
+    .gbc-loader {
+      transition: none;
+    }
+  }
+</style>
+
+<script is:inline>
+  // Inline and immediate: this has to be listening before the island loads,
+  // which is the whole point of the loader.
+  (function () {
+    var el = document.querySelector('[data-gbc-loader]');
+    if (!el) return;
+
+    var finished = false;
+    function finish() {
+      if (finished) return;
+      finished = true;
+      el.classList.add('is-done');
+      // Remove after the fade rather than leaving an invisible element in
+      // the layout and the accessibility tree.
+      window.setTimeout(function () {
+        if (el && el.parentNode) el.parentNode.removeChild(el);
+      }, 400);
+    }
+
+    window.addEventListener('gbc:ready', finish, { once: true });
+
+    // Failsafe: if WebGL is unavailable or the island throws, `gbc:ready`
+    // never fires and the loader would spin forever. Give up once the
+    // canvas has been painting for a moment, and unconditionally after a
+    // hard ceiling.
+    var poll = window.setInterval(function () {
+      if (document.querySelector('.gbc-stage canvas')) {
+        window.clearInterval(poll);
+        window.setTimeout(finish, 1200);
+      }
+    }, 200);
+
+    window.setTimeout(function () {
+      window.clearInterval(poll);
+      finish();
+    }, 12000);
+  })();
+</script>

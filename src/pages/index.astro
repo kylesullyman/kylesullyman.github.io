@@ -1,23 +1,29 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import GbcLoader from '../components/GbcLoader.astro';
 import HomeConsole from '../components/HomeConsole';
 ---
 
-<Layout title="Home">
+<Layout title="Home" deferTitle>
   <div class="home">
-    {/* WebGL + a canvas texture, so this island is client-only. */}
-    <HomeConsole client:only="react" />
-
-    <div class="home-copy">
-      <h1>Hi, I'm Kyle.</h1>
-      <p>
-        Welcome to my portfolio. Boot up the console above &mdash; the screen is
-        live and the buttons work.
-      </p>
-      <ul class="home-links">
-        <li><a href="/projects">Projects</a></li>
-        <li><a href="/about">About me</a></li>
-      </ul>
+    {/* The wrapper reserves the stage height so the loader has something to
+        fill while the client:only island is still downloading. */}
+    <div class="home-console">
+      <GbcLoader />
+      {/* WebGL + a canvas texture, so this island is client-only. */}
+      <HomeConsole client:only="react" />
     </div>
+
+    <!--<div class="home-copy">-->
+    <!--  <h1>Hi, I'm Kyle.</h1>-->
+    <!--  <p>-->
+    <!--    Welcome to my portfolio. Boot up the console above &mdash; the screen is-->
+    <!--    live and the buttons work.-->
+    <!--  </p>-->
+    <!--  <ul class="home-links">-->
+    <!--    <li><a href="/projects">Projects</a></li>-->
+    <!--    <li><a href="/about">About me</a></li>-->
+    <!--  </ul>-->
+    <!--</div>-->
   </div>
 </Layout>
