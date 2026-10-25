@@ -35,6 +35,13 @@ const { title } = Astro.props;
     flex-direction: column;
     align-items: center;
   }
+  .home-console {
+    position: relative;
+    width: 100%;
+    /* Reserves the stage height up front so the loader fills a stable box
+       and the canvas drops straight in without shifting the page. */
+    min-height: min(78vh, 680px);
+  }
   .gbc-stage {
     position: relative;
     width: 100%;
