@@ -24,6 +24,7 @@ import {
   PALETTE,
   PILL_BUTTONS,
   SCREEN,
+  SPEAKER,
   WORDMARK,
 } from '../spec';
 import {
@@ -128,9 +129,17 @@ export function Shell() {
 /**
  * Internals, visible through the transmissive shell: PCB, a couple of chips,
  * the speaker cone and the AA battery pair.
+ *
+ * Everything here must stay inside the shell walls. The plastic is
+ * transmissive, so a part that overhangs does not hide -- it renders outside
+ * the silhouette as a dark sliver, and a cylinder cap breaking the edge reads
+ * as a pinwheel of shaded triangles.
  */
 export function Internals() {
   const z = BODY.seam - 1.1;
+  // Keep internals clear of the wall, which is bevelled and so curves inward
+  // before it reaches the nominal half-width.
+  const innerX = BODY.width / 2 - 0.45;
   return (
     <group>
       {/* Main board */}
@@ -147,19 +156,23 @@ export function Internals() {
         <boxGeometry args={[1.3, 1.0, 0.2]} />
         <meshStandardMaterial color={PALETTE.chip} roughness={0.5} />
       </mesh>
-      {/* Speaker cone behind the grille */}
-      <mesh position={[2.5, -5.2, z - 0.3]} rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[1.5, 1.5, 0.5, 24]} />
+      {/* Speaker cone, sized to the grille it sits behind rather than
+          overhanging the shell edge. */}
+      <mesh position={[SPEAKER.x, SPEAKER.y, z - 0.3]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.9, 0.9, 0.5, 24]} />
         <meshStandardMaterial color="#1a1a1e" roughness={0.85} />
       </mesh>
-      {/* Two AAs in the lower back */}
-      {[-1.6, 1.6].map((x) => (
+      {/* Two AAs in the lower back. A 50mm cell is most of the 78mm body
+          width, so the pair stacks vertically -- side by side they would need
+          100mm and burst through both walls. Seated low enough to clear the
+          board above them. */}
+      {[-0.78, 0.78].map((offset) => (
         <mesh
-          key={x}
-          position={[x, -BODY.height * 0.3, BODY.back + 1.1]}
+          key={offset}
+          position={[0, -BODY.height * 0.34 + offset, BODY.back + 1.1]}
           rotation={[0, 0, Math.PI / 2]}
         >
-          <cylinderGeometry args={[0.72, 0.72, 5.0, 20]} />
+          <cylinderGeometry args={[0.72, 0.72, Math.min(5.0, innerX * 2), 20]} />
           <meshStandardMaterial color={PALETTE.battery} roughness={0.45} metalness={0.5} />
         </mesh>
       ))}
