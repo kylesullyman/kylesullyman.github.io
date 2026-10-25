@@ -1,7 +1,23 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import Home from '../components/Home';
+import HomeConsole from '../components/HomeConsole';
 ---
+
 <Layout title="Home">
-  <Home />
+  <div class="home">
+    {/* WebGL + a canvas texture, so this island is client-only. */}
+    <HomeConsole client:only="react" />
+
+    <div class="home-copy">
+      <h1>Hi, I'm Kyle.</h1>
+      <p>
+        Welcome to my portfolio. Boot up the console above &mdash; the screen is
+        live and the buttons work.
+      </p>
+      <ul class="home-links">
+        <li><a href="/projects">Projects</a></li>
+        <li><a href="/about">About me</a></li>
+      </ul>
+    </div>
+  </div>
 </Layout>
