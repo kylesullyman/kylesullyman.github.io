@@ -49,7 +49,9 @@ export function Console({ input, texture, on = true }: ConsoleProps) {
       <ScreenAssembly texture={texture} />
       <Labels />
 
-      <Dpad input={input} z={faceZ + 0.2} onHoverChange={onHoverChange} />
+      {/* Seated so the cross sits ~0.5mm proud of the shell face, like the
+          real pad. Dpad applies this once, on its outer group. */}
+      <Dpad input={input} z={faceZ + 0.27} onHoverChange={onHoverChange} />
 
       <RoundButton
         input={input}

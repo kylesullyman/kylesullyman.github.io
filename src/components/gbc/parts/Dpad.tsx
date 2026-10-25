@@ -71,7 +71,9 @@ export function Dpad({ input, z, onHoverChange }: DpadProps) {
 
     group.current.rotation.x = tilt.current.x;
     group.current.rotation.y = tilt.current.y;
-    group.current.position.z = z + tilt.current.z;
+    // Local offset only: the parent group already carries `z`. Adding it
+    // here too would seat the pad at 2*z and float it off the shell.
+    group.current.position.z = tilt.current.z;
   });
 
   return (
