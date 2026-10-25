@@ -33,7 +33,7 @@ const RETURN = 1.1;
 /** Below this, inertia is finished. */
 const VELOCITY_EPSILON = 0.0005;
 /** Pitch limit, radians -- keeps the console from tumbling end over end. */
-const PITCH_LIMIT = 0.65;
+export const PITCH_LIMIT = 0.65;
 
 export interface DragRotateProps {
   /** Drag is ignored while false (e.g. during the intro). */

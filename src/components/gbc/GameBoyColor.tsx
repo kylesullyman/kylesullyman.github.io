@@ -137,7 +137,7 @@ function Scene({
           <Console input={input} texture={texture} on={introDone} dragging={dragging} />
         </DragRotate>
       </IntroSpin>
-      <FitCamera target={spinGroup} />
+      <FitCamera target={spinGroup} fixed={spinHandle !== null} />
     </>
   );
 }

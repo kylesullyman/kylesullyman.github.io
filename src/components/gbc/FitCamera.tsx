@@ -14,6 +14,8 @@ import { useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 
+import { PITCH_LIMIT } from './DragRotate';
+
 /**
  * Fraction of the frame the console fills at the current pose.
  *
@@ -59,16 +61,35 @@ function measureBounds(group: THREE.Object3D) {
   return box.isEmpty() ? null : box;
 }
 
-export function FitCamera({ target }: { target: React.RefObject<THREE.Object3D | null> }) {
+/** Samples per axis when sweeping every reachable pose for the fixed fit. */
+const SWEEP_YAW_STEPS = 72;
+const SWEEP_PITCH_STEPS = 9;
+
+export function FitCamera({
+  target,
+  fixed = false,
+}: {
+  target: React.RefObject<THREE.Object3D | null>;
+  /**
+   * Hold one distance that frames every reachable pose, instead of tracking
+   * the current one. Touch uses this: rotation there comes from a small
+   * handle, and the camera breathing in and out under the thumb reads as the
+   * page zooming rather than the console turning.
+   */
+  fixed?: boolean;
+}) {
   const camera = useThree((state) => state.camera);
   const size = useThree((state) => state.size);
 
   const bounds = useRef<{ centre: THREE.Vector3; half: THREE.Vector3 } | null>(null);
   const distance = useRef(0);
+  /** Worst-pose distance, cached against the aspect it was swept for. */
+  const sweep = useRef({ aspect: 0, distance: 0 });
 
   // Scratch objects, reused so the per-frame fit allocates nothing.
   const corner = useRef(new THREE.Vector3()).current;
   const matrix = useRef(new THREE.Matrix4()).current;
+  const euler = useRef(new THREE.Euler(0, 0, 0, 'YXZ')).current;
 
   useFrame((_, rawDelta) => {
     if (!(camera instanceof THREE.PerspectiveCamera)) return;
@@ -92,24 +113,47 @@ export function FitCamera({ target }: { target: React.RefObject<THREE.Object3D |
     const tanV = Math.tan(vFov / 2);
     const tanH = Math.tan(2 * Math.atan(tanV * aspect) / 2);
 
-    // Fit the pose on screen right now. Rotating the box moves its corners
+    // Distance that fits a pose on screen. Rotating the box moves its corners
     // both sideways (needing a wider frame) and toward the camera
     // (magnifying them), so both effects have to come from the same matrix.
-    matrix.makeRotationFromEuler(group.rotation);
-    let required = 0;
-    for (let i = 0; i < 8; i += 1) {
-      corner.set(
-        centre.x + (i & 1 ? half.x : -half.x),
-        centre.y + (i & 2 ? half.y : -half.y),
-        centre.z + (i & 4 ? half.z : -half.z),
-      ).applyMatrix4(matrix);
+    const fit = (rotation: THREE.Euler) => {
+      matrix.makeRotationFromEuler(rotation);
+      let required = 0;
+      for (let i = 0; i < 8; i += 1) {
+        corner.set(
+          centre.x + (i & 1 ? half.x : -half.x),
+          centre.y + (i & 2 ? half.y : -half.y),
+          centre.z + (i & 4 ? half.z : -half.z),
+        ).applyMatrix4(matrix);
 
-      // Distance at which this corner lands exactly on each frame edge.
-      required = Math.max(
-        required,
-        corner.z + Math.abs(corner.x) / tanH,
-        corner.z + Math.abs(corner.y) / tanV,
-      );
+        // Distance at which this corner lands exactly on each frame edge.
+        required = Math.max(
+          required,
+          corner.z + Math.abs(corner.x) / tanH,
+          corner.z + Math.abs(corner.y) / tanV,
+        );
+      }
+      return required;
+    };
+
+    let required: number;
+    if (fixed) {
+      // Yaw is unbounded, so sweep the full turn at every pitch the drag
+      // allows. Only redone when the aspect changes (rotation, URL bar).
+      if (sweep.current.aspect !== aspect) {
+        let worst = 0;
+        for (let p = 0; p < SWEEP_PITCH_STEPS; p += 1) {
+          euler.x = -PITCH_LIMIT + (2 * PITCH_LIMIT * p) / (SWEEP_PITCH_STEPS - 1);
+          for (let y = 0; y < SWEEP_YAW_STEPS; y += 1) {
+            euler.y = (2 * Math.PI * y) / SWEEP_YAW_STEPS;
+            worst = Math.max(worst, fit(euler));
+          }
+        }
+        sweep.current = { aspect, distance: worst };
+      }
+      required = sweep.current.distance;
+    } else {
+      required = fit(group.rotation);
     }
     const targetDistance = required / FILL;
 
