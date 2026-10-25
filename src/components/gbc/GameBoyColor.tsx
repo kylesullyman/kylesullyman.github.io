@@ -15,6 +15,7 @@ import * as THREE from 'three';
 import { BODY, PALETTE } from './spec';
 import { GBC_EVENTS, KEY_MAP, createInput, type GbcButtonEvent } from './input';
 import { createEnvironment } from './environment';
+import { useIsTouch } from './useIsTouch';
 import { useScreen } from './screen/useScreen';
 import { IntroSpin } from './IntroSpin';
 import { FitCamera } from './FitCamera';
@@ -51,7 +52,14 @@ function SceneEnvironment() {
 }
 
 /** Everything inside the Canvas (needs the R3F context). */
-function Scene({ onReady }: { onReady: () => void }) {
+function Scene({
+  onReady,
+  spinHandle,
+}: {
+  onReady: () => void;
+  /** Touch-only rotation handle; null on pointer devices. */
+  spinHandle: HTMLElement | null;
+}) {
   const input = useMemo(() => createInput(), []);
   const [introDone, setIntroDone] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -120,6 +128,7 @@ function Scene({ onReady }: { onReady: () => void }) {
           enabled={introDone}
           onDragStart={handleDragStart}
           onDragChange={setDragging}
+          gestureElement={spinHandle}
         >
           <Console input={input} texture={texture} on={introDone} dragging={dragging} />
         </DragRotate>
@@ -145,6 +154,11 @@ export default function GameBoyColor({
 }: GameBoyColorProps) {
   const [ready, setReady] = useState(false);
   const liveRef = useRef<HTMLDivElement>(null);
+  const isTouch = useIsTouch();
+  // Callback ref, not useRef: DragRotate has to re-bind its listeners when
+  // the handle mounts, and a ref object mutating in place would not retrigger
+  // that effect.
+  const [spinHandle, setSpinHandle] = useState<HTMLElement | null>(null);
 
   // Bridge window events to props, and announce presses to screen readers.
   useEffect(() => {
@@ -189,15 +203,54 @@ export default function GameBoyColor({
         }}
       >
         <Suspense fallback={null}>
-          <Scene onReady={() => setReady(true)} />
+          <Scene onReady={() => setReady(true)} spinHandle={spinHandle} />
         </Suspense>
       </Canvas>
+
+      {/*
+        Touch-only rotation handle. Hold it and drag to spin; the console
+        itself stays non-rotating on touch so a finger on the canvas still
+        scrolls the page. Hidden entirely on pointer devices, where dragging
+        the console directly is unambiguous.
+      */}
+      {isTouch ? (
+        <button
+          ref={setSpinHandle}
+          disabled={!ready}
+          onContextMenu={(event) => event.preventDefault()}
+          type="button"
+          className={`gbc-spin-handle ${ready ? 'is-visible' : ''}`}
+          aria-label="Hold and drag to rotate the console"
+        >
+          <span className="gbc-spin-handle-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              {/* Circular arrow: reads as "rotate" without needing a label. */}
+              <path
+                d="M20 12a8 8 0 1 1-2.34-5.66"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+              />
+              <path
+                d="M20 3.5V8h-4.5"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </span>
+          <span className="gbc-spin-handle-text">Hold to spin</span>
+        </button>
+      ) : null}
 
       {/* Screen-reader announcements for button presses. */}
       <div ref={liveRef} aria-live="polite" className="gbc-sr-only" />
 
       <p className={`gbc-hint ${ready ? 'is-visible' : ''}`}>
-        Drag to spin it. Click the buttons, or use arrows, Z/X and Enter.
+        {isTouch
+          ? 'Tap the buttons. Hold the spin pad, bottom left, and drag to turn it.'
+          : 'Drag to spin it. Click the buttons, or use arrows, Z/X and Enter.'}
       </p>
     </div>
   );

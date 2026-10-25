@@ -94,6 +94,10 @@ export function useScreen({ input, initial = 'boot', paused = false }: UseScreen
     });
 
     texture.needsUpdate = true;
+    // Announce the first menu frame, not the end of the earlier intro spin.
+    if (current.id === 'menu' && state.current.frame === 1) {
+      input.emit('boot-complete');
+    }
     input.endFrame();
 
     if (next && next !== state.current.id) {

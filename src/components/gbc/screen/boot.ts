@@ -52,14 +52,14 @@ export const bootProgram: ScreenProgram = {
       rect(ctx, centerX - totalW / 2 + i * barW, y + (18 - h), barW - 1, h, color);
     });
 
-    drawText(ctx, 'GAME BOY', centerX, y + 24, LCD.black, {
-      scale: 2,
+    drawText(ctx, 'KYLE SULLIVAN', centerX, y + 24, LCD.black, {
+      scale: 1.5,
       align: 'center',
     });
-    drawText(ctx, 'COLOR', centerX, y + 42, LCD.dark, {
-      scale: 2,
-      align: 'center',
-    });
+    // drawText(ctx, 'COLOR', centerX, y + 42, LCD.dark, {
+    //   scale: 2,
+    //   align: 'center',
+    // });
 
     // Chime flash
     if (time > DROP_END && time < DROP_END + 0.12) {

@@ -1,7 +1,19 @@
 ---
-import Nav from '../components/Nav';
+// Self-hosted so the masthead does not wait on a third-party font request.
+// Subsets are split by unicode-range, so only the latin woff2 is fetched.
+import '@fontsource-variable/jetbrains-mono/wght.css';
 
-const { title } = Astro.props;
+interface Props {
+  title: string;
+  /**
+   * Hold the masthead hidden until the console finishes booting, then fade
+   * it in. Only the home page has a console; everywhere else it paints with
+   * the HTML.
+   */
+  deferTitle?: boolean;
+}
+
+const { title, deferTitle = false } = Astro.props;
 ---
 <!doctype html>
 <html lang="en">
@@ -11,10 +23,40 @@ const { title } = Astro.props;
     <title>{title} | Kyle Sullivan</title>
   </head>
   <body>
-    <Nav />
+    <p class:list={['site-title', { 'is-deferred': deferTitle }]}>
+      <a href="/">kyle sullivan</a>
+    </p>
     <main>
       <slot />
     </main>
+    <script is:inline>
+      // Inline and immediate so it is listening before the console island
+      // loads -- the boot-complete action does not replay. No-ops on pages
+      // whose title is not deferred.
+      (function () {
+        var el = document.querySelector('.site-title.is-deferred');
+        if (!el) return;
+
+        var shown = false;
+        function show() {
+          if (shown) return;
+          shown = true;
+          el.classList.add('is-visible');
+        }
+
+        function handleBoot(event) {
+          if (event.detail?.type !== 'boot-complete') return;
+          window.removeEventListener('gbc:action', handleBoot);
+          // A beat after the menu's first frame, including a skipped boot.
+          window.setTimeout(show, 1000);
+        }
+        window.addEventListener('gbc:action', handleBoot);
+
+        // Failsafe: without WebGL boot-complete never fires, and the title
+        // would stay invisible forever.
+        window.setTimeout(show, 12000);
+      })();
+    </script>
   </body>
 </html>
 
@@ -26,6 +68,31 @@ const { title } = Astro.props;
     padding: 1rem;
     line-height: 1.6;
   }
+  /* ---- Masthead ---- */
+  .site-title {
+    margin: 0 0 1.5rem;
+    text-align: center;
+    font-family: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo,
+      monospace;
+    font-size: clamp(1.5rem, 6vw, 2rem);
+    font-weight: 400;
+    letter-spacing: 0.02em;
+    line-height: 1.2;
+  }
+  .site-title a {
+    color: inherit;
+    text-decoration: none;
+  }
+  /* Deferred until the console boots. Only opacity animates, so the box is
+     laid out from the first paint and nothing shifts when it appears. */
+  .site-title.is-deferred {
+    opacity: 0;
+    transition: opacity 0.8s ease;
+  }
+  .site-title.is-deferred.is-visible {
+    opacity: 1;
+  }
+
   /* ---- Home: 3D console stage ---- */
   .home {
     /* Break out of the 40rem body column so the console has room. */
@@ -62,6 +129,18 @@ const { title } = Astro.props;
     user-select: none;
     -webkit-user-select: none;
   }
+  /* On touch the console does not rotate from the canvas -- the spin handle
+     owns that -- so a finger here should scroll the page normally in both
+     axes rather than being constrained to pan-y. */
+  @media (hover: none) and (pointer: coarse) {
+    .gbc-stage {
+      touch-action: auto;
+    }
+    .gbc-stage canvas {
+      touch-action: auto;
+      cursor: default;
+    }
+  }
   .gbc-sr-only {
     position: absolute;
     width: 1px;
@@ -80,6 +159,74 @@ const { title } = Astro.props;
   }
   .gbc-hint.is-visible {
     opacity: 1;
+  }
+
+  /* ---- Touch-only hold-to-spin handle ---- */
+  .gbc-spin-handle {
+    position: absolute;
+    left: 0.75rem;
+    /* Clears the hint line that sits under the canvas. */
+    bottom: 3.25rem;
+    z-index: 3;
+
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.6rem 0.85rem;
+    min-height: 44px;
+
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: #c8103c;
+
+    background: rgba(255, 255, 255, 0.92);
+    border: 1.5px solid rgba(200, 16, 60, 0.35);
+    border-radius: 999px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+
+    /* The whole point of the control: the browser must not claim the drag
+       for scrolling, or the handle only works until the finger moves. */
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    cursor: grab;
+
+    opacity: 0;
+    transition: opacity 0.4s ease 0.1s, transform 0.12s ease,
+      background 0.12s ease;
+  }
+  /* Only usable once the intro has finished, so it fades in with the hint. */
+  .gbc-spin-handle.is-visible {
+    opacity: 1;
+  }
+  .gbc-spin-handle:active {
+    transform: scale(0.95);
+    background: #c8103c;
+    border-color: #c8103c;
+    color: #fff;
+    cursor: grabbing;
+  }
+  .gbc-spin-handle-icon {
+    display: inline-flex;
+    width: 1.05rem;
+    height: 1.05rem;
+  }
+  .gbc-spin-handle-icon svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .gbc-spin-handle {
+      transition: none;
+    }
+    /* Still gated on the boot sequence, but it cuts in rather than fading. */
+    .site-title.is-deferred {
+      transition: none;
+    }
   }
   .home-readout {
     min-height: 1.5rem;
@@ -101,103 +248,5 @@ const { title } = Astro.props;
     list-style: none;
     margin: 1.5rem 0 0;
     padding: 0;
-  }
-
-  .dots-nav {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 2rem;
-  }
-  .dots-toggle {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 5px;
-    width: 3rem;
-    height: 2.25rem;
-    padding: 0;
-    border: 1px solid #ccc;
-    border-radius: 999px;
-    background: #fff;
-    cursor: pointer;
-    transition: background 0.25s ease, border-color 0.25s ease, transform 0.25s ease;
-  }
-  .dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: #333;
-    transition: transform 0.3s ease, background 0.3s ease;
-  }
-  .dots-links {
-    display: flex;
-    gap: 1rem;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    pointer-events: none;
-  }
-  .dots-links li {
-    opacity: 0;
-    transform: translateX(-0.75rem);
-    transition: opacity 0.25s ease, transform 0.25s ease;
-    transition-delay: calc((2 - var(--i)) * 50ms);
-  }
-  .dots-links a {
-    color: inherit;
-    text-decoration: none;
-    border-bottom: 2px solid transparent;
-    transition: border-color 0.2s ease;
-  }
-  .dots-links a:hover,
-  .dots-links a:focus-visible {
-    border-color: currentColor;
-  }
-
-  /* Open on hover, or on keyboard/tap focus */
-  .dots-nav:hover .dots-toggle,
-  .dots-nav:focus-within .dots-toggle {
-    background: #333;
-    border-color: #333;
-    transform: scale(1.08);
-  }
-  .dots-nav:hover .dot,
-  .dots-nav:focus-within .dot {
-    background: #fff;
-    animation: dot-bounce 0.6s ease infinite alternate;
-  }
-  .dots-nav:hover .dot:nth-child(2),
-  .dots-nav:focus-within .dot:nth-child(2) {
-    animation-delay: 0.15s;
-  }
-  .dots-nav:hover .dot:nth-child(3),
-  .dots-nav:focus-within .dot:nth-child(3) {
-    animation-delay: 0.3s;
-  }
-  .dots-nav:hover .dots-links,
-  .dots-nav:focus-within .dots-links {
-    pointer-events: auto;
-  }
-  .dots-nav:hover .dots-links li,
-  .dots-nav:focus-within .dots-links li {
-    opacity: 1;
-    transform: translateX(0);
-    transition-delay: calc(var(--i) * 70ms);
-  }
-
-  @keyframes dot-bounce {
-    to {
-      transform: translateY(-4px) scale(1.15);
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .dots-toggle,
-    .dot,
-    .dots-links li {
-      transition: none;
-      animation: none !important;
-    }
   }
 </style>

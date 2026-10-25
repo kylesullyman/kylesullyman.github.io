@@ -111,13 +111,13 @@ function drawControls({ ctx, input, time }: FrameContext) {
 }
 
 function drawMenu({ ctx, time, input }: FrameContext) {
-  // Header
-  rect(ctx, 0, 0, SCREEN_WIDTH, 22, LCD.dark);
-  rect(ctx, 0, 22, SCREEN_WIDTH, 1, LCD.light);
-  drawText(ctx, 'KYLE SULLIVAN', SCREEN_WIDTH / 2, 4, LCD.white, {
-    scale: 2,
-    align: 'center',
-  });
+  // // Header
+  // rect(ctx, 0, 0, SCREEN_WIDTH, 22, LCD.dark);
+  // rect(ctx, 0, 22, SCREEN_WIDTH, 1, LCD.light);
+  // drawText(ctx, 'KYLE SULLIVAN', SCREEN_WIDTH / 2, 10, LCD.white, {
+  //   scale: 1,
+  //   align: 'center',
+  // });
 
   ITEMS.forEach((item, i) => {
     const y = 38 + i * 20;
