@@ -9,12 +9,12 @@
  */
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Canvas } from '@react-three/fiber';
-import { Environment, Lightformer } from '@react-three/drei';
+import { Canvas, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 
 import { BODY, PALETTE } from './spec';
 import { GBC_EVENTS, KEY_MAP, createInput, type GbcButtonEvent } from './input';
+import { createEnvironment } from './environment';
 import { useScreen } from './screen/useScreen';
 import { IntroSpin } from './IntroSpin';
 import { FitCamera } from './FitCamera';
@@ -27,6 +27,27 @@ const REST_TILT: [number, number, number] = [-0.06, -0.14, 0.015];
 function prefersReducedMotion() {
   if (typeof window === 'undefined') return false;
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+/**
+ * Installs the procedural environment map as `scene.environment`.
+ * Built once per renderer, and released on unmount.
+ */
+function SceneEnvironment() {
+  const gl = useThree((state) => state.gl);
+  const scene = useThree((state) => state.scene);
+
+  useEffect(() => {
+    const texture = createEnvironment(gl);
+    const previous = scene.environment;
+    scene.environment = texture;
+    return () => {
+      scene.environment = previous;
+      texture.dispose();
+    };
+  }, [gl, scene]);
+
+  return null;
 }
 
 /** Everything inside the Canvas (needs the R3F context). */
@@ -92,11 +113,7 @@ function Scene({ onReady }: { onReady: () => void }) {
       <directionalLight position={[12, 4, 10]} intensity={0.7} color="#ffd9e2" />
       <directionalLight position={[0, -6, -14]} intensity={1.5} color={PALETTE.shellAttenuation} />
 
-      <Environment resolution={128}>
-        <Lightformer intensity={2.2} position={[-6, 8, 10]} scale={[12, 12, 1]} />
-        <Lightformer intensity={1.1} position={[8, 2, 8]} scale={[8, 8, 1]} color="#ffc4d2" />
-        <Lightformer intensity={1.6} position={[0, -8, -10]} scale={[14, 6, 1]} color="#ff5577" />
-      </Environment>
+      <SceneEnvironment />
 
       <IntroSpin disabled={reduced} onComplete={handleComplete} restTilt={REST_TILT}>
         <DragRotate
@@ -164,6 +181,11 @@ export default function GameBoyColor({
         onCreated={({ gl }) => {
           gl.toneMapping = THREE.ACESFilmicToneMapping;
           gl.toneMappingExposure = 1.06;
+          // The shell uses transmission, which makes three re-render the whole
+          // scene into a backdrop target every frame. That target is sampled
+          // through rough, refracting plastic, so full resolution buys nothing
+          // visible -- half scale quarters the fragment work for the pass.
+          gl.transmissionResolutionScale = 0.5;
         }}
       >
         <Suspense fallback={null}>
