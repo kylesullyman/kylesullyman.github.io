@@ -1,50 +1,7 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import AboutContent from '../components/AboutContent.astro';
 ---
 <Layout title="About">
-  <div class="about">
-    <img src="/images/kyle-headshot.jpg" alt="Kyle Sullivan" class="about-photo" />
-    <div class="about-copy">
-      <p>
-        <strong>Hi, I'm Kyle Sullivan</strong> &mdash; a computer science major
-        and game dev minor at Chapman University.
-      </p>
-      <p class="about-skills">
-        Proficient in C++, C#, Python, Java, C<br />
-        Learning TypeScript, HTML, CSS<br />
-        Video editing &mdash; After Effects / Premiere<br />
-        Design &mdash; Photoshop / Illustrator
-      </p>
-      <p>
-        <strong>Contact:</strong>
-        <a href="mailto:kylsullivan@chapman.edu">kylsullivan@chapman.edu</a>
-      </p>
-    </div>
-  </div>
+  <AboutContent />
 </Layout>
-
-<style>
-  .about {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 1.5rem;
-    text-align: center;
-  }
-  .about-photo {
-    width: 12rem;
-    height: 14rem;
-    border-radius: 45%;
-    object-fit: cover;
-    object-position: center 20%;
-  }
-  .about-copy {
-    max-width: 30rem;
-  }
-  .about-copy p {
-    margin: 0 0 1rem;
-  }
-  .about-skills {
-    color: #555;
-  }
-</style>

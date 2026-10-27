@@ -34,6 +34,8 @@ const RETURN = 1.1;
 const VELOCITY_EPSILON = 0.0005;
 /** Pitch limit, radians -- keeps the console from tumbling end over end. */
 export const PITCH_LIMIT = 0.65;
+/** How fast the resting yaw follows a change of `lean`. */
+const LEAN_FOLLOW = 3.5;
 
 export interface DragRotateProps {
   /** Drag is ignored while false (e.g. during the intro). */
@@ -59,6 +61,12 @@ export interface DragRotateProps {
    * than like a switch that cuts the motion dead.
    */
   gestureElement?: HTMLElement | null;
+  /**
+   * Extra resting yaw, radians, e.g. to turn the console toward content
+   * beside it. Eased separately from the drag so changing it reads as a
+   * deliberate turn rather than the slow spring home.
+   */
+  lean?: number;
   children: React.ReactNode;
 }
 
@@ -68,6 +76,7 @@ export function DragRotate({
   onDragStart,
   onDragChange,
   gestureElement = null,
+  lean = 0,
   children,
 }: DragRotateProps) {
   const group = useRef<THREE.Group>(null);
@@ -96,6 +105,7 @@ export function DragRotate({
     velYaw: 0,
     velPitch: 0,
   });
+  const leanCurrent = useRef(lean);
 
   useEffect(() => {
     // When a handle is supplied it owns the gesture outright and the canvas
@@ -247,10 +257,11 @@ export function DragRotate({
     const follow = 1 - Math.exp(-delta * FOLLOW);
     state.yaw += (state.targetYaw - state.yaw) * follow;
     state.pitch += (state.targetPitch - state.pitch) * follow;
+    leanCurrent.current += (lean - leanCurrent.current) * (1 - Math.exp(-delta * LEAN_FOLLOW));
 
     // YXZ keeps yaw world-vertical, so dragging sideways never rolls it.
     node.rotation.order = 'YXZ';
-    node.rotation.y = state.yaw;
+    node.rotation.y = state.yaw + leanCurrent.current;
     node.rotation.x = state.pitch;
   });
 

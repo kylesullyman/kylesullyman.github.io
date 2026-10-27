@@ -2,6 +2,8 @@
 import Layout from '../layouts/Layout.astro';
 import GbcLoader from '../components/GbcLoader.astro';
 import HomeConsole from '../components/HomeConsole';
+import ProjectsContent from '../components/ProjectsContent.astro';
+import AboutContent from '../components/AboutContent.astro';
 ---
 
 <Layout title="Home" deferTitle>
@@ -13,6 +15,25 @@ import HomeConsole from '../components/HomeConsole';
       {/* WebGL + a canvas texture, so this island is client-only. */}
       <HomeConsole client:only="react" />
     </div>
+
+    {/* Desktop only: menu links open these beside the console instead of
+        navigating away. Keyed by the href the menu emits, so a link with no
+        panel here still falls through to a normal page load. Inert until
+        opened so their links and video controls stay out of the tab order. */}
+    <section class="home-panel" data-home-panel="/projects" aria-labelledby="panel-projects" inert>
+      <header class="home-panel-header">
+        <h1 id="panel-projects">Projects</h1>
+        <button type="button" class="home-panel-close" data-home-panel-close aria-label="Close projects">&times;</button>
+      </header>
+      <ProjectsContent />
+    </section>
+    <section class="home-panel" data-home-panel="/about" aria-labelledby="panel-about" inert>
+      <header class="home-panel-header">
+        <h1 id="panel-about">About me</h1>
+        <button type="button" class="home-panel-close" data-home-panel-close aria-label="Close about me">&times;</button>
+      </header>
+      <AboutContent />
+    </section>
 
     <!--<div class="home-copy">-->
     <!--  <h1>Hi, I'm Kyle.</h1>-->

@@ -55,8 +55,11 @@ function SceneEnvironment() {
 function Scene({
   onReady,
   spinHandle,
+  lean,
 }: {
   onReady: () => void;
+  /** Extra resting yaw; see DragRotate. */
+  lean: number;
   /** Touch-only rotation handle; null on pointer devices. */
   spinHandle: HTMLElement | null;
 }) {
@@ -133,28 +136,39 @@ function Scene({
           onDragStart={handleDragStart}
           onDragChange={setDragging}
           gestureElement={spinHandle}
+          lean={lean}
         >
           <Console input={input} texture={texture} on={introDone} dragging={dragging} />
         </DragRotate>
       </IntroSpin>
-      <FitCamera target={spinGroup} fixed={spinHandle !== null} />
+      <FitCamera target={spinGroup} steady={spinHandle !== null} dragging={dragging} />
     </>
   );
 }
 
 export interface GameBoyColorProps {
-  /** Height of the canvas area. */
+  /**
+   * Height of the canvas area.
+   *
+   * Defaults to the stage height the page reserves for the loader, so the
+   * canvas lands in exactly the box the loader was filling and nothing
+   * reflows when it appears. The fallback only applies when this is mounted
+   * outside that layout.
+   */
   height?: string;
   /** Called for every button press/release. */
   onButton?: (event: GbcButtonEvent) => void;
   /** Called for `gbc:action` events from screen programs. */
   onAction?: (detail: { type: string } & Record<string, unknown>) => void;
+  /** Extra resting yaw, radians; positive turns the screen to the right. */
+  lean?: number;
 }
 
 export default function GameBoyColor({
-  height = 'min(78vh, 680px)',
+  height = 'var(--gbc-stage-height, min(78svh, 680px))',
   onButton,
   onAction,
+  lean = 0,
 }: GameBoyColorProps) {
   const [ready, setReady] = useState(false);
   const liveRef = useRef<HTMLDivElement>(null);
@@ -207,7 +221,7 @@ export default function GameBoyColor({
         }}
       >
         <Suspense fallback={null}>
-          <Scene onReady={() => setReady(true)} spinHandle={spinHandle} />
+          <Scene onReady={() => setReady(true)} spinHandle={spinHandle} lean={lean} />
         </Suspense>
       </Canvas>
 

@@ -101,13 +101,32 @@ const { title, deferTitle = false } = Astro.props;
     display: flex;
     flex-direction: column;
     align-items: center;
+
+    /*
+      Everything the stage has to share the screen with: the body's padding,
+      the masthead and its margin, and the readout. The spin handle hangs
+      below the stage rather than sitting in flow, so its overhang is counted
+      here too -- otherwise it is the first thing off the bottom.
+    */
+    --gbc-chrome: 8.5rem;
+    /*
+      svh, not vh: on a phone vh is the *large* viewport, measured as if the
+      URL bar were hidden. The page does not scroll, so anything budgeted
+      against vh while the bar is actually showing is simply unreachable --
+      which is how the spin handle ended up under the browser chrome.
+
+      The floor keeps the console usable on short landscape phones, where
+      subtracting the chrome from the viewport leaves almost nothing; there
+      the page scrolls instead.
+    */
+    --gbc-stage-height: max(18rem, min(calc(100svh - var(--gbc-chrome)), 680px));
   }
   .home-console {
     position: relative;
-    width: 100%;
     /* Reserves the stage height up front so the loader fills a stable box
        and the canvas drops straight in without shifting the page. */
-    min-height: min(78vh, 680px);
+    width: 100%;
+    min-height: var(--gbc-stage-height);
   }
   .gbc-stage {
     position: relative;
@@ -233,6 +252,100 @@ const { title, deferTitle = false } = Astro.props;
     letter-spacing: 0.08em;
     color: #c8103c;
   }
+  /* ---- Home: desktop side panel ---- */
+  /* Closed panels are kept out of layout entirely below the desktop
+     breakpoint; on phones the menu navigates to the standalone pages. */
+  .home-panel {
+    display: none;
+  }
+  /* Keep in sync with PANEL_QUERY in HomeConsole. */
+  @media (min-width: 64rem) and (hover: hover) and (pointer: fine) {
+    .home {
+      /* On desktop the canvas can grow with the available height; the
+         phone-sized 680px ceiling leaves a small console on tall monitors. */
+      --gbc-stage-height: max(18rem, calc(100svh - var(--gbc-chrome)));
+    }
+    .home-console {
+      /* Size the camera's frame to the space it can actually occupy when a
+         panel opens. Keep this width in both states so sliding the console
+         does not resize the canvas or change its scale mid-transition. */
+      width: 50vw;
+      flex: none;
+      transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    /* Slides the console's centre from the middle of the viewport to the
+       middle of its left half, leaving the right half to the panel. */
+    .home[data-panel] .home-console {
+      transform: translateX(-25vw);
+    }
+    .home-panel {
+      display: block;
+      position: fixed;
+      /* Starts below the masthead so the title stays clickable. */
+      top: 4.5rem;
+      right: 0;
+      bottom: 0;
+      width: 50vw;
+      z-index: 4;
+      box-sizing: border-box;
+      padding: 0 max(2rem, 4vw) 2rem;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+
+      opacity: 0;
+      visibility: hidden;
+      transform: translateX(3rem);
+      /* Visibility waits for the fade so the panel stays painted while it
+         leaves, then drops out of hit-testing. */
+      transition: opacity 0.35s ease, transform 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+        visibility 0s linear 0.6s;
+    }
+    .home-panel.is-open {
+      opacity: 1;
+      visibility: visible;
+      transform: none;
+      transition: opacity 0.45s ease 0.15s,
+        transform 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.1s, visibility 0s;
+    }
+  }
+  .home-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+  }
+  .home-panel-header h1 {
+    margin: 0;
+    font-family: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo,
+      monospace;
+    font-size: 1.25rem;
+    font-weight: 400;
+    letter-spacing: 0.02em;
+  }
+  .home-panel-close {
+    width: 2.25rem;
+    height: 2.25rem;
+    padding: 0;
+    font-size: 1.5rem;
+    line-height: 1;
+    color: #111;
+    background: none;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+  }
+  .home-panel-close:hover,
+  .home-panel-close:focus-visible {
+    background: #f0f0f2;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .home-console,
+    .home-panel,
+    .home-panel.is-open {
+      transition: none;
+    }
+  }
+
   .home-copy {
     max-width: 34rem;
     text-align: center;
